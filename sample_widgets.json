@@ -1,0 +1,15 @@
+{
+  "name": "Sample widgets",
+  "widgets": [
+    {"type": "arc",    "label": "SPEED", "source": "speed_kmh", "min": 0, "max": 300, "x": 3,  "y": 6,  "w": 28, "h": 54, "color": "#FFD60A"},
+    {"type": "number", "label": "OIL",   "source": "oil_temp",   "decimals": 0, "x": 34, "y": 6,  "w": 19, "h": 24, "color": "#FF7A00", "alert_above": 130},
+    {"type": "number", "label": "WATER", "source": "water_temp", "decimals": 0, "x": 55, "y": 6,  "w": 19, "h": 24, "color": "#19D3FF", "alert_above": 110},
+    {"type": "bar",    "label": "BOOST", "source": "boost", "min": 0, "max": 2, "decimals": 2, "x": 34, "y": 36, "w": 40, "h": 24, "color": "#2EE66B"},
+    {"type": "light",  "label": "REV LIMIT", "source": "rev_limiter", "x": 78, "y": 6,  "w": 19, "h": 15, "color": "#FF2D3C"},
+    {"type": "light",  "label": "TCS", "source": "tcs", "x": 78, "y": 25, "w": 19, "h": 15, "color": "#FF7A00"},
+    {"type": "light",  "label": "ASM", "source": "asm", "x": 78, "y": 44, "w": 19, "h": 15, "color": "#19D3FF"},
+    {"type": "number", "label": "BEST LAP",    "source": "best_time",    "x": 3,  "y": 68, "w": 30, "h": 26, "color": "#FFD60A"},
+    {"type": "number", "label": "CURRENT LAP", "source": "current_time", "x": 36, "y": 68, "w": 30, "h": 26, "color": "#F4F4F4"},
+    {"type": "number", "label": "DELTA",       "source": "delta", "decimals": 2, "x": 69, "y": 68, "w": 28, "h": 26, "color": "#2EE66B", "alert_above": 0}
+  ]
+}
