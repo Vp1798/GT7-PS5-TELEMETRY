@@ -77,7 +77,7 @@ class MainActivity : Activity() {
         dash.soundOn = soundOn
         val gd = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
             override fun onSingleTapUp(e: MotionEvent): Boolean {
-                if (e.x > dash.width * 0.8f && e.y < dash.height * 0.1f) toggleSound() else togglePage()
+                if (e.x > dash.width * 0.75f && e.y < dash.height * 0.2f) toggleSound() else togglePage()
                 return true
             }
             override fun onLongPress(e: MotionEvent) { stopAll() }

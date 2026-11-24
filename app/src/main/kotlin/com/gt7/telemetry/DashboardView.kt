@@ -87,7 +87,7 @@ class DashboardView(ctx: Context, private val tracker: LapTracker) : View(ctx) {
 
     private fun txt(
         c: Canvas, s: String, x: Float, y: Float, size: Float, color: Int, align: Paint.Align,
-        style: Int = Typeface.NORMAL, mono: Boolean = false, spacing: Float = 0f,
+        style: Int = Typeface.NORMAL, mono: Boolean = false, spacing: Float = 0f, maxW: Float = 0f,
     ) {
         paint.style = Paint.Style.FILL
         paint.color = color
@@ -95,6 +95,10 @@ class DashboardView(ctx: Context, private val tracker: LapTracker) : View(ctx) {
         paint.textAlign = align
         paint.letterSpacing = spacing
         paint.typeface = Typeface.create(if (mono) Typeface.MONOSPACE else Typeface.DEFAULT, style)
+        if (maxW > 0f) {
+            val mw = paint.measureText(s)
+            if (mw > maxW) paint.textSize = size * maxW / mw
+        }
         c.drawText(s, x, y, paint)
         paint.letterSpacing = 0f
     }
@@ -110,16 +114,22 @@ class DashboardView(ctx: Context, private val tracker: LapTracker) : View(ctx) {
     }
 
     override fun onDraw(c: Canvas) {
-        val w = width.toFloat()
-        val h = height.toFloat()
+        val vw = width.toFloat()
+        val vh = height.toFloat()
         val bmp = bgBmp
         if (bmp != null) c.drawBitmap(bmp, 0f, 0f, null) else c.drawColor(cBg)
         val t = data
         val now = System.nanoTime()
         if (t == null || now - lastPacketNs > 2_000_000_000L) {
-            txt(c, statusText, w / 2, h / 2, h * 0.06f, cSub, Paint.Align.CENTER, Typeface.BOLD_ITALIC, spacing = 0.05f)
+            txt(c, statusText, vw / 2, vh / 2, vh * 0.06f, cSub, Paint.Align.CENTER, Typeface.BOLD_ITALIC, spacing = 0.05f)
             return
         }
+        // Design area: never narrower than 16:9. Tablets (4:3, 3:2) get centred with bars
+        // top and bottom instead of squeezed panels.
+        val w = vw
+        val h = min(vh, vw / 1.7778f)
+        c.save()
+        c.translate(0f, (vh - h) / 2f)
 
         val cx = w / 2
         val cy = h * 0.52f
@@ -238,7 +248,7 @@ class DashboardView(ctx: Context, private val tracker: LapTracker) : View(ctx) {
             val l = lx0 + h * 0.06f + (i % 2) * (tw + h * 0.03f)
             val tp = h * 0.13f + (i / 2) * (th + h * 0.03f)
             rr(c, l, tp, l + tw, tp + th, tyreColor(t.tyres[i]), 10f)
-            txt(c, String.format("%.0f", t.tyres[i]), l + tw / 2, tp + th * 0.66f, th * 0.5f, 0xFF07080A.toInt(), Paint.Align.CENTER, Typeface.BOLD_ITALIC)
+            txt(c, String.format("%.0f", t.tyres[i]), l + tw / 2, tp + th * 0.66f, th * 0.46f, 0xFF07080A.toInt(), Paint.Align.CENTER, Typeface.BOLD_ITALIC, maxW = tw * 0.86f)
         }
         // TCS / ASM lights
         val by2 = h * 0.57f
@@ -247,10 +257,10 @@ class DashboardView(ctx: Context, private val tracker: LapTracker) : View(ctx) {
         val lit2 = t.asmActive
         val l1 = lx0 + h * 0.06f
         val l2 = l1 + bw2 + h * 0.03f
-        para(c, l1, by2, l1 + bw2, by2 + h * 0.085f, h * 0.02f, if (lit1) cOrange else cPanel)
-        para(c, l2, by2, l2 + bw2, by2 + h * 0.085f, h * 0.02f, if (lit2) cCyan else cPanel)
-        txt(c, "TCS", l1 + bw2 / 2, by2 + h * 0.058f, h * 0.045f, if (lit1) 0xFF07080A.toInt() else cSub, Paint.Align.CENTER, Typeface.BOLD_ITALIC, spacing = 0.1f)
-        txt(c, "ASM", l2 + bw2 / 2, by2 + h * 0.058f, h * 0.045f, if (lit2) 0xFF07080A.toInt() else cSub, Paint.Align.CENTER, Typeface.BOLD_ITALIC, spacing = 0.1f)
+        para(c, l1, by2, l1 + bw2, by2 + h * 0.085f, h * 0.02f, if (lit1) cOrange else cDim)
+        para(c, l2, by2, l2 + bw2, by2 + h * 0.085f, h * 0.02f, if (lit2) cCyan else cDim)
+        txt(c, "TCS", l1 + bw2 / 2, by2 + h * 0.058f, h * 0.045f, if (lit1) 0xFF07080A.toInt() else cSub, Paint.Align.CENTER, Typeface.BOLD_ITALIC, spacing = 0.1f, maxW = bw2 * 0.8f)
+        txt(c, "ASM", l2 + bw2 / 2, by2 + h * 0.058f, h * 0.045f, if (lit2) 0xFF07080A.toInt() else cSub, Paint.Align.CENTER, Typeface.BOLD_ITALIC, spacing = 0.1f, maxW = bw2 * 0.8f)
         // Brake
         txt(c, "BRAKE", lx0 + h * 0.06f, h * 0.73f, h * 0.032f, cSub, Paint.Align.LEFT, Typeface.BOLD, spacing = 0.15f)
         bar(c, lx0 + h * 0.06f, h * 0.745f, lx1 - h * 0.04f, h * 0.805f, t.brake, cRed)
@@ -260,31 +270,32 @@ class DashboardView(ctx: Context, private val tracker: LapTracker) : View(ctx) {
         // ---- Right panel: lap, times, fuel, throttle
         val rx0 = (cx + r * 1.08f).coerceAtMost(w - m - h * 0.3f)
         val rx1 = w - m
+        val rtw = rx1 - (rx0 + h * 0.06f) - h * 0.03f
         para(c, rx0, h * 0.05f, rx1, h * 0.60f, h * 0.03f, cPanel)
         val lapStr = if (t.laps > 0) "LAP ${t.lap}/${t.laps}" else "LAP ${t.lap}"
-        txt(c, lapStr, rx0 + h * 0.06f, h * 0.12f, h * 0.06f, cAccent, Paint.Align.LEFT, Typeface.BOLD_ITALIC, spacing = 0.08f)
+        txt(c, lapStr, rx0 + h * 0.06f, h * 0.12f, h * 0.06f, cAccent, Paint.Align.LEFT, Typeface.BOLD_ITALIC, spacing = 0.08f, maxW = rtw)
         val cur = (tracker.curLapSec * 1000).toInt()
         val labels = arrayOf("CURRENT", "LAST", "BEST")
         val vals = arrayOf(fmt(cur), fmt(t.lastMs), fmt(t.bestMs))
         for (i in 0 until 3) {
             val y = h * 0.22f + i * h * 0.125f
             txt(c, labels[i], rx0 + h * 0.06f, y, h * 0.03f, cSub, Paint.Align.LEFT, Typeface.BOLD, spacing = 0.15f)
-            txt(c, vals[i], rx0 + h * 0.06f, y + h * 0.065f, h * 0.062f, if (i == 2) cAccent else cText, Paint.Align.LEFT, Typeface.BOLD, mono = true)
+            txt(c, vals[i], rx0 + h * 0.06f, y + h * 0.065f, h * 0.062f, if (i == 2) cAccent else cText, Paint.Align.LEFT, Typeface.BOLD, mono = true, maxW = rtw)
         }
         // Fuel
         val fp = if (t.fuelCap > 0f) (t.fuel / t.fuelCap).coerceIn(0f, 1f) else 0f
         val ll = tracker.lapsLeft
         val fuelStr = String.format("FUEL %.0f%%", fp * 100f) + if (ll >= 0f) String.format("  ~%.1f LAPS", ll) else ""
-        txt(c, fuelStr, rx0 + h * 0.06f, h * 0.665f, h * 0.034f, cSub, Paint.Align.LEFT, Typeface.BOLD, mono = true)
+        txt(c, fuelStr, rx0 + h * 0.06f, h * 0.665f, h * 0.034f, cSub, Paint.Align.LEFT, Typeface.BOLD, mono = true, maxW = rtw)
         bar(c, rx0 + h * 0.06f, h * 0.68f, rx1 - h * 0.04f, h * 0.72f, fp, if (fp < 0.15f) cRed else cBlue)
         // Throttle
         txt(c, "THROTTLE", rx0 + h * 0.06f, h * 0.775f, h * 0.032f, cSub, Paint.Align.LEFT, Typeface.BOLD, spacing = 0.15f)
         bar(c, rx0 + h * 0.06f, h * 0.79f, rx1 - h * 0.04f, h * 0.85f, t.throttle, cGreen)
         val oil = String.format("OIL %.0f°", t.oilTemp)
         val wat = String.format("WATER %.0f°", t.waterTemp)
-        txt(c, "$oil   $wat", rx0 + h * 0.06f, h * 0.90f, h * 0.036f, cSub, Paint.Align.LEFT, Typeface.BOLD, mono = true)
+        txt(c, "$oil   $wat", rx0 + h * 0.06f, h * 0.90f, h * 0.036f, cSub, Paint.Align.LEFT, Typeface.BOLD, mono = true, maxW = rtw)
         if (t.hasTurbo) {
-            txt(c, String.format("BOOST %.2f BAR", t.boost.coerceAtLeast(0f)), rx0 + h * 0.06f, h * 0.95f, h * 0.036f, cSub, Paint.Align.LEFT, Typeface.BOLD, mono = true)
+            txt(c, String.format("BOOST %.2f BAR", t.boost.coerceAtLeast(0f)), rx0 + h * 0.06f, h * 0.95f, h * 0.036f, cSub, Paint.Align.LEFT, Typeface.BOLD, mono = true, maxW = rtw)
         }
 
         txt(c, if (soundOn) "SOUND ON" else "SOUND OFF", w - h * 0.04f, h * 0.04f, h * 0.03f, if (soundOn) cAccent else cSub, Paint.Align.RIGHT, Typeface.BOLD, spacing = 0.1f)
@@ -298,5 +309,6 @@ class DashboardView(ctx: Context, private val tracker: LapTracker) : View(ctx) {
         }
 
         if (t.paused) txt(c, "PAUSED", cx, cy - r * 0.62f, r * 0.12f, cOrange, Paint.Align.CENTER, Typeface.BOLD_ITALIC, spacing = 0.1f)
+        c.restore()
     }
 }
